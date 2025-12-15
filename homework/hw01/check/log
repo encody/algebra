@@ -1,0 +1,147 @@
+0 sort
+1 cp 0
+2 var 1 A
+3 weak 1 1 A
+4 weak 0 1 A
+5 cp 4
+6 var 5 B
+7 weak 5 5 B
+8 weak 4 5 B
+9 sp 8 0
+10 var 9 a
+11 weak 8 9 a
+12 sp 11 1
+13 form 9 12
+14 cp 8
+15 cp 14
+16 conv 13 15
+17 def 0 16 implies
+18 cp 17
+19 var 18 A
+20 weak 18 18 A
+21 weak 17 18 A
+22 cp 21
+23 var 22 B
+24 weak 22 22 B
+25 weak 21 22 B
+26 cp 25
+27 var 26 a
+28 weak 25 26 a
+29 sp 28 0
+30 sp 28 1
+31 sp 28 2
+32 cp 28
+33 cp 28
+34 conv 30 32
+35 conv 31 33
+36 inst 28 2 34 35 0
+37 cp 28
+38 cp 28
+39 conv 29 37
+40 conv 36 38
+41 inst 28 2 39 40 0
+42 sp 28 2
+43 cp 28
+44 cp 28
+45 conv 41 43
+46 conv 42 44
+47 inst 28 2 45 46 0
+48 form 26 47
+49 cp 25
+50 cp 49
+51 conv 48 50
+52 def 17 51 and
+53 cp 52
+54 var 53 A
+55 weak 53 53 A
+56 weak 52 53 A
+57 cp 56
+58 var 57 B
+59 weak 57 57 B
+60 weak 56 57 B
+61 sp 60 0
+62 var 61 u
+63 weak 61 61 u
+64 weak 60 61 u
+65 sp 64 1
+66 var 65 v
+67 weak 65 65 v
+68 weak 64 65 v
+69 cp 68
+70 var 69 a
+71 weak 68 69 a
+72 sp 71 0
+73 sp 71 1
+74 sp 71 4
+75 cp 71
+76 cp 71
+77 conv 73 75
+78 conv 74 76
+79 inst 71 2 77 78 0
+80 cp 71
+81 cp 71
+82 conv 72 80
+83 conv 79 81
+84 inst 71 2 82 83 0
+85 var 84 c
+86 weak 71 84 c
+87 sp 86 5
+88 sp 86 2
+89 sp 86 0
+90 var 89 d
+91 weak 86 89 d
+92 sp 91 1
+93 var 92 b
+94 weak 91 92 b
+95 sp 94 4
+96 form 92 95
+97 form 89 96
+98 sp 86 0
+99 conv 87 97
+100 conv 88 98
+101 appl 99 100
+102 sp 86 3
+103 sp 86 1
+104 var 103 b
+105 weak 86 103 b
+106 sp 105 4
+107 form 103 106
+108 sp 86 1
+109 conv 101 107
+110 conv 102 108
+111 appl 109 110
+112 sp 86 4
+113 form 84 112
+114 conv 111 112
+115 abst 114 113
+116 sp 71 0
+117 sp 71 1
+118 sp 71 4
+119 cp 71
+120 cp 71
+121 conv 117 119
+122 conv 118 120
+123 inst 71 2 121 122 0
+124 cp 71
+125 cp 71
+126 conv 116 124
+127 conv 123 125
+128 inst 71 2 126 127 0
+129 var 128 b
+130 weak 71 128 b
+131 sp 130 4
+132 form 128 131
+133 form 69 132
+134 conv 115 132
+135 abst 134 133
+136 cp 68
+137 sp 136 0
+138 sp 136 1
+139 cp 136
+140 cp 136
+141 conv 137 139
+142 conv 138 140
+143 inst 136 2 141 142 1
+144 conv 135 143
+145 def 52 144 and_in
+-1
