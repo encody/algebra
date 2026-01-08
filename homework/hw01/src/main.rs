@@ -1,6 +1,6 @@
 use std::io::{BufRead, BufReader};
 
-use hw01::take_expr;
+use hw01::parse::take_expr;
 
 fn main() {
     let stdin = BufReader::new(std::io::stdin());
