@@ -1,8 +1,22 @@
 use colored::Colorize;
-use std::{fmt::Display, str::FromStr};
+use std::{collections::HashSet, fmt::Display, str::FromStr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Var(pub char);
+
+impl FromStr for Var {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() == 1
+            && let Some(c) = s.chars().nth(0)
+        {
+            Ok(Self(c))
+        } else {
+            Err("must be a single character")
+        }
+    }
+}
 
 impl Display for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -28,7 +42,7 @@ impl Display for Square {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lambda(pub Var, pub Expr, pub Expr);
 
 impl Display for Lambda {
@@ -37,7 +51,7 @@ impl Display for Lambda {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pi(pub Var, pub Expr, pub Expr);
 
 impl Display for Pi {
@@ -46,12 +60,12 @@ impl Display for Pi {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Definition(pub Box<[char]>, pub Vec<Expr>);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Definition(pub String, pub Vec<Expr>);
 
 impl Display for Definition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}[", self.0.iter().collect::<String>().green())?;
+        write!(f, "{}[", self.0.green())?;
         if !self.1.is_empty() {
             write!(f, "({})", self.1[0])?;
             for x in &self.1[1..] {
@@ -62,7 +76,7 @@ impl Display for Definition {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Application(pub Expr, pub Expr);
 
 impl Display for Application {
@@ -71,7 +85,7 @@ impl Display for Application {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expr {
     Var(Var),
     Asterisk,
@@ -148,7 +162,73 @@ impl FromStr for Expr {
 }
 
 impl Expr {
+    pub fn is_sort(&self) -> bool {
+        matches!(self, Self::Asterisk | Self::Square)
+    }
+
     pub fn de_bruijn(&self) -> crate::de_bruijn::Expr {
-        crate::de_bruijn::de_bruijn(self, &crate::de_bruijn::BindingStack::Empty)
+        crate::de_bruijn::de_bruijn(self, &crate::de_bruijn::Bindings::new(None))
+    }
+
+    pub fn alpha_substitution(&self, var: Var, expr: Expr) -> Expr {
+        crate::de_bruijn::de_bruijn(self, &crate::de_bruijn::Bindings::new(Some((var, expr))))
+            .into()
+    }
+
+    pub fn free_vars(&self) -> HashSet<Var> {
+        match self {
+            Expr::Asterisk | Expr::Square => HashSet::new(),
+            Expr::Var(var) => HashSet::from([*var]),
+            Expr::Lambda(lambda) => {
+                let mut fv = lambda.2.free_vars();
+                fv.remove(&lambda.0);
+                fv.extend(lambda.1.free_vars());
+                fv
+            }
+            Expr::Pi(pi) => {
+                let mut fv = pi.2.free_vars();
+                fv.remove(&pi.0);
+                fv.extend(pi.1.free_vars());
+                fv
+            }
+            Expr::Definition(definition) => {
+                definition.1.iter().fold(HashSet::new(), |mut hs, e| {
+                    hs.extend(e.free_vars());
+                    hs
+                })
+            }
+            Expr::Application(application) => {
+                let mut fv = application.0.free_vars();
+                fv.extend(application.1.free_vars());
+                fv
+            }
+        }
+    }
+}
+
+pub fn generate_free_var_gte(fv: &HashSet<Var>, mut v: Var) -> Var {
+    #[allow(clippy::char_lit_as_u8)]
+    while fv.contains(&v) {
+        v.0 = ((v.0 as u8 + 1) % ('a' as u8)) as char;
+    }
+    v
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case("x", ['x'])]
+    #[case("%(x)(y)", ['x', 'y'])]
+    #[case("$x:(*).(x)", [])]
+    #[case("$x:(*).(%(x)(y))", ['y'])]
+    fn free_vars(#[case] e: Expr, #[case] fv: impl IntoIterator<Item = char>) {
+        assert_eq!(
+            e.free_vars(),
+            fv.into_iter().map(Var).collect::<HashSet<Var>>()
+        );
     }
 }

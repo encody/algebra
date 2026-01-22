@@ -1,4 +1,8 @@
-#[derive(Clone, Debug, PartialEq, Eq)]
+use std::collections::HashSet;
+
+use crate::model::generate_free_var_gte;
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Var(Var),
     Asterisk,
@@ -9,81 +13,160 @@ pub enum Expr {
     Application(Box<Application>),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+impl From<Expr> for crate::model::Expr {
+    fn from(value: Expr) -> Self {
+        match value {
+            Expr::Var(Var::Bound(_, v) | Var::Free(v)) => crate::model::Expr::Var(v),
+            Expr::Asterisk => crate::model::Expr::Asterisk,
+            Expr::Square => crate::model::Expr::Square,
+            Expr::Lambda(l) => crate::model::Lambda(l.0, l.1.into(), l.2.into()).into(),
+            Expr::Pi(pi) => crate::model::Pi(pi.0, pi.1.into(), pi.2.into()).into(),
+            Expr::Definition(d) => {
+                crate::model::Definition(d.0, d.1.into_iter().map(Into::into).collect()).into()
+            }
+            Expr::Application(a) => crate::model::Application(a.0.into(), a.1.into()).into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum Var {
     Free(crate::model::Var),
-    Bound(usize),
+    Bound(usize, crate::model::Var),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Lambda(pub Expr, pub Expr);
+impl PartialEq for Var {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Free(v1), Self::Free(v2)) => v1 == v2,
+            (Self::Bound(i1, _), Self::Bound(i2, _)) => i1 == i2,
+            _ => false,
+        }
+    }
+}
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Pi(pub Expr, pub Expr);
+#[derive(Clone, Debug)]
+pub struct Lambda(pub crate::model::Var, pub Expr, pub Expr);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Definition(pub Box<[char]>, pub Vec<Expr>);
+impl PartialEq for Lambda {
+    fn eq(&self, other: &Self) -> bool {
+        self.1 == other.1 && self.2 == other.2
+    }
+}
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
+pub struct Pi(pub crate::model::Var, pub Expr, pub Expr);
+
+impl PartialEq for Pi {
+    fn eq(&self, other: &Self) -> bool {
+        self.1 == other.1 && self.2 == other.2
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Definition(pub String, pub Vec<Expr>);
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Application(pub Expr, pub Expr);
 
-#[derive(Debug, Clone, Default)]
-pub enum BindingStack<'a> {
-    #[default]
-    Empty,
-    Binding {
-        var: crate::model::Var,
-        previous: &'a BindingStack<'a>,
-    },
+#[derive(Clone, Debug)]
+pub struct Bindings {
+    stack: Vec<Binding>,
+    substitution: Option<(crate::model::Var, crate::model::Expr)>,
 }
 
-impl<'a> BindingStack<'a> {
-    fn with<'b>(&'b self, new: crate::model::Var) -> BindingStack<'b> {
-        BindingStack::Binding {
-            var: new,
-            previous: self,
+#[derive(Clone, Debug)]
+struct Binding {
+    original: crate::model::Var,
+    rename: crate::model::Var,
+}
+
+impl Bindings {
+    pub fn new(substitution: Option<(crate::model::Var, crate::model::Expr)>) -> Self {
+        Self {
+            stack: vec![],
+            substitution,
         }
     }
 
-    fn index(&self, search: &crate::model::Var) -> Option<usize> {
-        let mut stack = self;
-        let mut index = 1usize;
-        while let Self::Binding { var, previous } = stack {
-            if var == search {
-                return Some(index);
-            }
-            stack = previous;
-            index += 1;
-        }
-
-        None
+    pub fn substitution_free_vars(&self) -> HashSet<crate::model::Var> {
+        self.substitution
+            .as_ref()
+            .map_or(HashSet::new(), |(_, body)| body.free_vars())
     }
 
-    fn get_binding(&self, search: crate::model::Var) -> Var {
+    fn with(&self, original: crate::model::Var, rename: crate::model::Var) -> Self {
+        let mut s = self.clone();
+        s.stack.push(Binding { original, rename });
+        s
+    }
+
+    fn index(&self, search: &crate::model::Var) -> IndexResult {
+        if let Some((ix, v)) = self
+            .stack
+            .iter()
+            .rev()
+            .enumerate()
+            .find(|(_, v)| &v.original == search)
+        {
+            return IndexResult::Index {
+                index: ix + 1,
+                rename: v.rename,
+            };
+        }
+
+        if let Some((sub_v, sub_e)) = &self.substitution
+            && sub_v == search
+        {
+            return IndexResult::Substitution(sub_e.clone());
+        }
+
+        IndexResult::Free
+    }
+
+    fn get_binding_or_substitution(&self, search: crate::model::Var) -> Expr {
         match self.index(&search) {
-            Some(index) => Var::Bound(index),
-            None => Var::Free(search),
+            IndexResult::Index { index, rename } => Expr::Var(Var::Bound(index, rename)),
+            IndexResult::Free => Expr::Var(Var::Free(search)),
+            IndexResult::Substitution(e) => e.de_bruijn(),
         }
     }
 }
 
-pub fn de_bruijn(e: &crate::model::Expr, bindings: &BindingStack<'_>) -> Expr {
+enum IndexResult {
+    Free,
+    Index {
+        index: usize,
+        rename: crate::model::Var,
+    },
+    Substitution(crate::model::Expr),
+}
+
+pub fn de_bruijn(e: &crate::model::Expr, bindings: &Bindings) -> Expr {
     match e {
-        crate::model::Expr::Var(var) => Expr::Var(bindings.get_binding(*var)),
+        crate::model::Expr::Var(var) => bindings.get_binding_or_substitution(*var),
         crate::model::Expr::Asterisk => Expr::Asterisk,
         crate::model::Expr::Square => Expr::Square,
         crate::model::Expr::Lambda(lambda) => {
             let crate::model::Lambda(var, m, n) = &**lambda;
+            let mut fv = bindings.substitution_free_vars();
+            fv.extend(n.free_vars());
+            let rename = generate_free_var_gte(&fv, *var);
             Expr::Lambda(Box::new(Lambda(
+                rename,
                 de_bruijn(m, bindings),
-                de_bruijn(n, &bindings.with(*var)),
+                de_bruijn(n, &bindings.with(*var, rename)),
             )))
         }
         crate::model::Expr::Pi(pi) => {
             let crate::model::Pi(var, m, n) = &**pi;
+            let mut fv = bindings.substitution_free_vars();
+            fv.extend(n.free_vars());
+            let rename = generate_free_var_gte(&fv, *var);
             Expr::Pi(Box::new(Pi(
+                rename,
                 de_bruijn(m, bindings),
-                de_bruijn(n, &bindings.with(*var)),
+                de_bruijn(n, &bindings.with(*var, rename)),
             )))
         }
         crate::model::Expr::Definition(crate::model::Definition(a, exprs)) => {
@@ -107,7 +190,30 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    #[test]
+    #[case("x", "x", "z", "z")]
+    #[case("%(x)(x)", "x", "z", "%(z)(z)")]
+    #[case("%($x:(*).(x))(x)", "x", "z", "%($x:(*).(x))(z)")]
+    #[case("$y:(*).(%(y)(x))", "x", "%(x)(y)", "$z:(*).(%(z)(%(x)(y)))")]
+    #[case("$x:(*).(%(y)(x))", "x", "%(x)(y)", "$z:(*).(%(y)(z))")]
+    #[case(
+        "$x:(*).($y:(*).(%(z)(%(z)(x))))",
+        "z",
+        "y",
+        "$x:(*).($v:(*).(%(y)(%(y)(x))))"
+    )]
+    fn substitution(
+        #[case] e: crate::model::Expr,
+        #[case] v: crate::model::Var,
+        #[case] sub: crate::model::Expr,
+        #[case] expected: crate::model::Expr,
+    ) {
+        assert_eq!(
+            e.alpha_substitution(v, sub).de_bruijn(),
+            expected.de_bruijn(),
+        );
+    }
+
+    #[rstest]
     #[case(
         "%($x:(*).(%(x)($z:(*).(%(x)(y)))))(z)",
         "%($x:(*).(%(x)($z:(*).(%(x)(y)))))(z)"
@@ -127,7 +233,6 @@ mod tests {
     }
 
     #[rstest]
-    #[test]
     #[case(
         "%($x:(*).(%(x)($z:(*).(%(x)(y)))))(z)",
         "%($y:(*).(%(y)($z:(*).(%(y)(y)))))(z)"

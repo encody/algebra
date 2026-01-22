@@ -68,7 +68,7 @@ fn take_application(input: &mut &[char]) -> Result<Application> {
     Ok(Application(m, n))
 }
 
-fn take_definition(name: Box<[char]>, input: &mut &[char]) -> Result<Definition> {
+fn take_definition(name: String, input: &mut &[char]) -> Result<Definition> {
     take_exact(input, '[')?;
     let mut d = vec![];
     if take_exact(input, '(').is_ok() {
@@ -97,7 +97,7 @@ pub fn take_expr(input: &mut &[char]) -> Result<Expr> {
         let name = {
             let mut buf = vec!['0'; i];
             buf.copy_from_slice(&input[0..i]);
-            buf.into_boxed_slice()
+            buf.into_iter().collect::<String>()
         };
         *input = &input[i..];
         return take_definition(name, input).map(Into::into);
