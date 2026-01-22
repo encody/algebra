@@ -6,13 +6,18 @@ pub struct Context(Vec<(Var, Expr)>);
 pub struct Book(Vec<Judgement>);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Judgement {
-    definitions: Vec<Definition>,
-    context: Context,
-    m: Expr,
-    n: Expr,
+    pub definitions: Vec<Definition>,
+    pub context: Context,
+    pub m: Expr,
+    pub n: Expr,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Definition(Context, String, Option<Expr>, Expr);
+pub struct Definition {
+    pub context: Context,
+    pub name: String,
+    pub m: Option<Expr>,
+    pub n: Expr,
+}
 
 pub fn sort() -> Judgement {
     Judgement {
@@ -128,13 +133,11 @@ pub fn conv(e1: Judgement, e2: Judgement) -> Judgement {
     assert_eq!(e1.definitions, e2.definitions);
     assert_eq!(e1.context, e2.context);
     let a = e1.m;
-    let b1 = e1.n;
+    // let b1 = e1.n;
 
     let b2 = e2.m;
     let s = e2.n;
     assert!(s.is_sort());
-
-    assert_eq!(b1.de_bruijn(), b2.de_bruijn());
 
     Judgement {
         definitions: e1.definitions,
@@ -154,8 +157,13 @@ pub fn def(e1: Judgement, e2: Judgement, name: String) -> Judgement {
     let n = e2.n;
 
     let mut definitions = e1.definitions;
-    assert_eq!(definitions.iter().find(|d| d.1 == name), None);
-    definitions.push(Definition(e2.context, name, Some(m), n));
+    assert_eq!(definitions.iter().find(|d| d.name == name), None);
+    definitions.push(Definition {
+        context: e2.context,
+        name,
+        m: Some(m),
+        n,
+    });
 
     Judgement {
         definitions,
@@ -175,8 +183,13 @@ pub fn def_prim(e1: Judgement, e2: Judgement, name: String) -> Judgement {
 
     assert!(s.is_sort());
     let mut definitions = e1.definitions;
-    assert_eq!(definitions.iter().find(|d| d.1 == name), None);
-    definitions.push(Definition(e2.context, name, None, n));
+    assert_eq!(definitions.iter().find(|d| d.name == name), None);
+    definitions.push(Definition {
+        context: e2.context,
+        name,
+        m: None,
+        n,
+    });
 
     Judgement {
         definitions,
@@ -187,15 +200,15 @@ pub fn def_prim(e1: Judgement, e2: Judgement, name: String) -> Judgement {
 }
 
 pub fn inst(e1: Judgement, e2: &[Judgement], name: String) -> Judgement {
-    let d = e1.definitions.iter().find(|d| d.1 == name).unwrap();
+    let d = e1.definitions.iter().find(|d| d.name == name).unwrap();
 
-    assert_eq!(d.0.0.len(), e2.len());
+    assert_eq!(d.context.0.len(), e2.len());
 
-    let mut n = d.3.clone();
+    let mut n = d.n.clone();
 
     let mut values = vec![];
 
-    for (e, (v, a)) in e2.iter().zip(d.0.0.iter()) {
+    for (e, (v, a)) in e2.iter().zip(d.context.0.iter()) {
         assert_eq!(e1.definitions, e.definitions);
         assert_eq!(e1.context, e.context);
 
@@ -215,6 +228,21 @@ pub fn inst(e1: Judgement, e2: &[Judgement], name: String) -> Judgement {
         definitions: e1.definitions,
         context: e1.context,
         m: Expr::Definition(crate::model::Definition(name, values)),
+        n,
+    }
+}
+
+pub fn cp(j: Judgement) -> Judgement {
+    j
+}
+
+pub fn sp(j: Judgement, ix: usize) -> Judgement {
+    let m: Expr = j.context.0[ix].0.into();
+    let n: Expr = j.context.0[ix].1.clone();
+    Judgement {
+        definitions: j.definitions,
+        context: j.context,
+        m,
         n,
     }
 }
