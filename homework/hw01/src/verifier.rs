@@ -1,3 +1,5 @@
+use std::io::BufRead;
+
 use crate::{
     model::Var,
     rule::{self, Judgement},
@@ -160,6 +162,8 @@ impl Verifier {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{BufRead, BufReader};
+
     use super::*;
 
     #[test]
@@ -167,5 +171,21 @@ mod tests {
         let input = include_str!("../check/log");
 
         Verifier::run(input);
+    }
+
+    #[test]
+    pub fn check2() {
+        let input_path = "../hw01/check/bez_rules";
+        let input = BufReader::new(std::fs::File::open(input_path).unwrap());
+
+        let mut v = Verifier::new();
+
+        for line in input.lines() {
+            let line = line.unwrap();
+            if line == "-1" {
+                break;
+            }
+            v.run_line(&line);
+        }
     }
 }
