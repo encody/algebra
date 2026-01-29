@@ -42,7 +42,7 @@ impl Display for Square {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Lambda(pub Var, pub Expr, pub Expr);
 
 impl Display for Lambda {
@@ -51,7 +51,7 @@ impl Display for Lambda {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Pi(pub Var, pub Expr, pub Expr);
 
 impl Display for Pi {
@@ -60,7 +60,7 @@ impl Display for Pi {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Definition(pub String, pub Vec<Expr>);
 
 impl Display for Definition {
@@ -76,7 +76,7 @@ impl Display for Definition {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Application(pub Expr, pub Expr);
 
 impl Display for Application {
@@ -85,7 +85,7 @@ impl Display for Application {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Expr {
     Var(Var),
     Asterisk,

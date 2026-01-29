@@ -1,13 +1,8 @@
-use std::io::BufRead;
+use crate::{model::Var, rule::Resolver};
 
-use crate::{
-    model::Var,
-    rule::{self, Judgement},
-};
-
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct Verifier {
-    judgements: Vec<Judgement>,
+    resolver: Resolver,
 }
 
 struct Tokenizer<T>(T);
@@ -44,7 +39,9 @@ impl<'a, T: Iterator<Item = &'a str>> Tokenizer<T> {
 
 impl Verifier {
     pub fn new() -> Self {
-        Self { judgements: vec![] }
+        Self {
+            resolver: Resolver::new(),
+        }
     }
 
     pub fn run(input: &str) {
@@ -63,98 +60,96 @@ impl Verifier {
         let mut t = Tokenizer(line.split(' '));
         let lineno = t.line_number();
 
-        assert_eq!(lineno, self.judgements.len(), "wrong line number");
+        assert_eq!(lineno, self.resolver.judgements.len(), "wrong line number");
 
         let op_name = t.instruction();
 
-        let j = match op_name {
-            "sort" => rule::sort(),
+        match op_name {
+            "sort" => self.resolver.sort(),
             "var" => {
-                let j = self.judgements[t.judgement()].clone();
+                let j = t.judgement();
 
                 let var = t.variable();
 
-                rule::var(j, var)
+                self.resolver.var(j, var)
             }
             "weak" => {
-                let a = self.judgements[t.judgement()].clone();
-                let b = self.judgements[t.judgement()].clone();
+                let a = t.judgement();
+                let b = t.judgement();
                 let var = t.variable();
 
-                rule::weak(a, b, var)
+                self.resolver.weak(a, b, var)
             }
             "form" => {
-                let a = self.judgements[t.judgement()].clone();
-                let b = self.judgements[t.judgement()].clone();
+                let a = t.judgement();
+                let b = t.judgement();
 
-                rule::form(a, b)
+                self.resolver.form(a, b)
             }
             "appl" => {
-                let a = self.judgements[t.judgement()].clone();
-                let b = self.judgements[t.judgement()].clone();
+                let a = t.judgement();
+                let b = t.judgement();
 
-                rule::appl(a, b)
+                self.resolver.appl(a, b)
             }
             "abst" => {
-                let a = self.judgements[t.judgement()].clone();
-                let b = self.judgements[t.judgement()].clone();
+                let a = t.judgement();
+                let b = t.judgement();
 
-                rule::abst(a, b)
+                self.resolver.abst(a, b)
             }
             "conv" => {
-                let a = self.judgements[t.judgement()].clone();
-                let b = self.judgements[t.judgement()].clone();
+                let a = t.judgement();
+                let b = t.judgement();
 
-                rule::conv(a, b)
+                self.resolver.conv(a, b)
             }
             "def" => {
-                let a = self.judgements[t.judgement()].clone();
-                let b = self.judgements[t.judgement()].clone();
+                let a = t.judgement();
+                let b = t.judgement();
 
                 let name = t.constant();
 
-                rule::def(a, b, name)
+                self.resolver.def(a, b, name)
             }
             "defpr" => {
-                let a = self.judgements[t.judgement()].clone();
-                let b = self.judgements[t.judgement()].clone();
+                let a = t.judgement();
+                let b = t.judgement();
 
                 let name = t.constant();
 
-                rule::def_prim(a, b, name)
+                self.resolver.def_prim(a, b, name)
             }
             "inst" => {
-                let m = self.judgements[t.judgement()].clone();
+                let m = t.judgement();
                 let n = t.take_usize("arity");
 
                 let mut args = Vec::with_capacity(n);
 
                 for _ in 0..n {
-                    args.push(self.judgements[t.judgement()].clone());
+                    args.push(t.judgement());
                 }
 
-                let definition = m.definitions[t.take_usize("definition index")].clone();
+                let definition = t.take_usize("definition index");
 
-                rule::inst(m, &args, definition.name)
+                self.resolver.inst_ix(m, &args, definition)
             }
             "cp" => {
-                let a = self.judgements[t.judgement()].clone();
+                let a = t.judgement();
 
-                rule::cp(a)
+                self.resolver.cp(a)
             }
             "sp" => {
-                let a = self.judgements[t.judgement()].clone();
+                let a = t.judgement();
 
                 let ix = t.take_usize("sp index");
 
-                rule::sp(a, ix)
+                self.resolver.sp(a, ix)
             }
             i => panic!("Unknown instruction {i}"),
         };
 
         t.end();
-
-        self.judgements.push(j);
 
         eprintln!("ok");
     }
